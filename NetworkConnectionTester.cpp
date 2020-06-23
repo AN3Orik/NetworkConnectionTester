@@ -18,11 +18,11 @@ class NetworkConnectionTester {
         TCP_ESTATS_DATA_ROD_v0 Data;
         TCP_ESTATS_PATH_ROD_v0 Path;
 
-    	NetworkProcessStatisticRecord(TCP_ESTATS_DATA_ROD_v0 data, TCP_ESTATS_PATH_ROD_v0 path) {
+        NetworkProcessStatisticRecord(TCP_ESTATS_DATA_ROD_v0 data, TCP_ESTATS_PATH_ROD_v0 path) {
             Timestamp = time(nullptr);
             Data = data;
             Path = path;
-    	}
+        }
 
         double CalculateLost(NetworkProcessStatisticRecord start) {
             if (Timestamp <= start.Timestamp) {
@@ -36,29 +36,29 @@ class NetworkConnectionTester {
             if (Path.BytesRetrans <= start.Path.BytesRetrans) {
                 return 0;
             }
-    		
+            
             long sendDelta = Data.DataBytesOut - start.Data.DataBytesOut;
             long retransDelta = Path.BytesRetrans - start.Path.BytesRetrans;
 
             return max(0, min((retransDelta * 100.0 / sendDelta), 100));
         }
     };
-	
+
     struct NetworkProcess {
         MIB_TCPROW_OWNER_PID TcpRow;
         u_short RemotePort;
         long LastUpdated;
         u_int Ping;
         u_int PacketLossPercent;
-    	
+
     private:
         std::vector<NetworkProcessStatisticRecord> _networkStatisticRecords;
-    	
+
     public:
         void Update(TCP_ESTATS_DATA_ROD_v0 data, TCP_ESTATS_PATH_ROD_v0 path) {
             LastUpdated = time(nullptr);
-        	
-        	// Cleanup outdated statistic records
+            
+            // Cleanup outdated statistic records
             while (!_networkStatisticRecords.empty() && LastUpdated - _networkStatisticRecords.begin()->Timestamp > 20
                 || _networkStatisticRecords.size() > 5) {
                 _networkStatisticRecords.erase(_networkStatisticRecords.begin());
@@ -87,21 +87,21 @@ class NetworkConnectionTester {
 #endif
         }
     };
-	
+    
 private:
     DWORD _processId;
     std::vector<int> _ports;
     std::thread _statisticThread;
     std::atomic<bool> _statisticThreadRunning = false;
-	
+    
 public:
     std::map<u_short, NetworkProcess*> NetworkProcesses;
-	
+    
     ~NetworkConnectionTester() {
         Stop();
     }
 
-	NetworkConnectionTester(DWORD processId, std::vector<int> ports) {
+    NetworkConnectionTester(DWORD processId, std::vector<int> ports) {
         _processId = processId;
         _ports = ports;
     }
@@ -128,15 +128,15 @@ public:
             CollectProcessTcpConnections();
             for (auto iterator = NetworkProcesses.begin(), next_it = iterator; iterator != NetworkProcesses.end(); iterator = next_it) {
                 ++next_it;
-            	
+                
                 u_short port = iterator->first;
                 NetworkProcess* networkProcess = iterator->second;
 
-            	if (networkProcess->LastUpdated > 0 && time(nullptr) - networkProcess->LastUpdated > 5) {
-            		// Remove connections without activity (closed connections)
+                if (networkProcess->LastUpdated > 0 && time(nullptr) - networkProcess->LastUpdated > 5) {
+                    // Remove connections without activity (closed connections)
                     NetworkProcesses.erase(iterator);
-            		continue;
-            	}
+                     continue;
+                }
 
                 TCP_ESTATS_DATA_ROD_v0 dataRod;
                 DWORD dataResult = GetPerTcpConnectionEStats(
@@ -147,7 +147,7 @@ public:
                     (PUCHAR)&dataRod,
                     0,
                     sizeof(dataRod));
-            	
+                
                 TCP_ESTATS_PATH_ROD_v0 pathRod;
                 DWORD pathResult = GetPerTcpConnectionEStats(
                     reinterpret_cast<PMIB_TCPROW>(&networkProcess->TcpRow),
@@ -158,18 +158,18 @@ public:
                     0,
                     sizeof(pathRod));
 
-            	if (dataResult == NO_ERROR && pathResult == NO_ERROR) {
+                if (dataResult == NO_ERROR && pathResult == NO_ERROR) {
                     networkProcess->Update(dataRod, pathRod);
-            	}
+                }
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
     }
 
-	/***
-	 * Collect all TCP connections related to specified process & ports
-	 * and enable TCP extended metric for found connections
-	 */
+    /***
+     * Collect all TCP connections related to specified process & ports
+     * and enable TCP extended metric for found connections
+     */
     void CollectProcessTcpConnections() {
         DWORD size;
         GetExtendedTcpTable(NULL, &size, false, AF_INET, TCP_TABLE_OWNER_PID_ALL, 0);
@@ -178,11 +178,11 @@ public:
         std::vector<MIB_TCPROW_OWNER_PID> resultTable;
         for (DWORD dwLoop = 0; dwLoop < pTCPInfo->dwNumEntries; dwLoop++) {
             MIB_TCPROW_OWNER_PID tableRow = pTCPInfo->table[dwLoop];
-        	if (tableRow.dwOwningPid == _processId) {
+            if (tableRow.dwOwningPid == _processId) {
                 u_short remotePort = ntohs(tableRow.dwRemotePort);
-        		if (std::find(_ports.begin(), _ports.end(), remotePort) != _ports.end()) {
-        			if (!NetworkProcesses.count(remotePort)) {
-        				// Enable TCP statistics and put to map
+                if (std::find(_ports.begin(), _ports.end(), remotePort) != _ports.end()) {
+                    if (!NetworkProcesses.count(remotePort)) {
+                        // Enable TCP statistics and put to map
                         TCP_ESTATS_DATA_RW_v0 dataRw;
                         dataRw.EnableCollection = 1;
                         DWORD setDataResult = SetPerTcpConnectionEStats(
@@ -209,9 +209,9 @@ public:
                             networkProcess->TcpRow = tableRow;
                             NetworkProcesses.insert({ remotePort, networkProcess });
                         }
-        			}
-        		}
-        	}
+                   }
+                }
+            }
         }
     }
 };
