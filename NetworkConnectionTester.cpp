@@ -83,7 +83,7 @@ class NetworkConnectionTester {
             }
 
 #ifdef _DEBUG
-            std::cout << "[PID " << TcpRow.dwOwningPid << "] Ping: " << Ping << "ms Packet loss: " << PacketLossPercent << "%" << std::endl;
+            std::cout << "[PID " << TcpRow.dwOwningPid << "] " << "Port: " << RemotePort << " Ping: " << Ping << "ms Packet loss: " << PacketLossPercent << "%" << std::endl;
 #endif
         }
     };
@@ -119,6 +119,9 @@ public:
             if (_statisticThread.joinable()) {
                 _statisticThread.join();
             }
+            for (auto networkPair : NetworkProcesses) {
+                delete networkPair.second;
+            }
             NetworkProcesses.clear();
         }
     }
@@ -135,7 +138,8 @@ public:
                 if (networkProcess->LastUpdated > 0 && time(nullptr) - networkProcess->LastUpdated > 5) {
                     // Remove connections without activity (closed connections)
                     NetworkProcesses.erase(iterator);
-                     continue;
+                    delete networkProcess;
+                    continue;
                 }
 
                 TCP_ESTATS_DATA_ROD_v0 dataRod;
@@ -213,5 +217,6 @@ public:
                 }
             }
         }
+        free(pTCPInfo);
     }
 };
